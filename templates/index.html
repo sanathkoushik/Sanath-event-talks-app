@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BigQuery Release Hub - Live Updates & Sharing</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar / Header Area -->
+        <header class="app-header">
+            <div class="brand-container">
+                <div class="logo-wrapper">
+                    <svg class="bq-logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <!-- BigQuery inspired grid/cloud icon -->
+                        <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z" fill="currentColor"/>
+                        <path d="M12 9v4M12 15h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h1>BigQuery</h1>
+                    <span class="sub-brand">Release Hub</span>
+                </div>
+            </div>
+
+            <div class="status-panel">
+                <div class="status-item">
+                    <span class="status-dot green"></span>
+                    <span class="status-text">Feed Status: <span id="feed-status-text">Active</span></span>
+                </div>
+                <div class="status-item text-muted">
+                    <i class="far fa-clock"></i>
+                    <span id="last-sync-time">Never synced</span>
+                </div>
+            </div>
+
+            <div class="navigation-controls">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="search-input" placeholder="Filter release notes...">
+                </div>
+
+                <div class="filter-pills" id="type-filters">
+                    <button class="filter-pill active" data-type="all">All</button>
+                    <button class="filter-pill" data-type="feature"><span class="pill-dot feature"></span>Feature</button>
+                    <button class="filter-pill" data-type="announcement"><span class="pill-dot announcement"></span>Announcement</button>
+                    <button class="filter-pill" data-type="deprecation"><span class="pill-dot deprecation"></span>Deprecation</button>
+                    <button class="filter-pill" data-type="bugfix"><span class="pill-dot bugfix"></span>Bug Fix</button>
+                </div>
+            </div>
+
+            <button id="refresh-btn" class="btn btn-primary btn-refresh">
+                <i class="fa-solid fa-rotate-right spinner-icon" id="refresh-icon"></i>
+                <span>Refresh Notes</span>
+            </button>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="app-main">
+            <!-- Loading State -->
+            <div id="loading-state" class="state-container hidden">
+                <div class="spinner-loader">
+                    <div class="spinner-ring"></div>
+                    <i class="fa-solid fa-database loader-center-icon"></i>
+                </div>
+                <h3>Fetching BigQuery Release Notes</h3>
+                <p class="text-muted">Parsing the live Google Cloud documentation feed...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="error-state" class="state-container hidden">
+                <div class="error-illustration">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                </div>
+                <h3>Failed to Fetch Updates</h3>
+                <p id="error-message" class="error-text">An unknown error occurred while retrieving the feed.</p>
+                <button id="retry-btn" class="btn btn-secondary mt-3">
+                    <i class="fa-solid fa-rotate-right"></i> Try Again
+                </button>
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="state-container hidden">
+                <div class="empty-illustration">
+                    <i class="fa-solid fa-folder-open"></i>
+                </div>
+                <h3>No Release Notes Found</h3>
+                <p class="text-muted">No release notes matched your search query or filter criteria.</p>
+                <button id="clear-filters-btn" class="btn btn-secondary mt-3">Clear Filters</button>
+            </div>
+
+            <!-- Notes List Container -->
+            <div id="release-notes-container" class="notes-timeline">
+                <!-- Dynamically populated -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Floating Action Bar for Selected Items -->
+    <div id="floating-action-bar" class="floating-bar hidden">
+        <div class="bar-content">
+            <div class="selection-count">
+                <span class="count-badge" id="selected-count-badge">0</span>
+                <span>updates selected for sharing</span>
+            </div>
+            <div class="bar-actions">
+                <button id="clear-selection-btn" class="btn btn-text">Clear</button>
+                <button id="compose-selected-btn" class="btn btn-primary">
+                    <i class="fa-brands fa-x-twitter"></i> Compose Combined Tweet
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tweet Composer Modal -->
+    <div id="tweet-modal" class="modal-backdrop hidden">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2><i class="fa-brands fa-x-twitter"></i> Tweet Composer</h2>
+                <button class="modal-close" id="close-modal-btn">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="tweet-preview-header">
+                    <span class="preview-label">Preview Draft</span>
+                    <span class="char-counter" id="char-counter">0 / 280</span>
+                </div>
+                
+                <div class="tweet-textarea-wrapper">
+                    <textarea id="tweet-textarea" rows="8" placeholder="What is happening?"></textarea>
+                </div>
+
+                <div class="modal-tips">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <span>Tip: Links count as 23 characters regardless of length. Character count is auto-calculated.</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="copy-tweet-btn" class="btn btn-secondary">
+                    <i class="fa-regular fa-copy"></i> Copy Text
+                </button>
+                <button id="submit-tweet-btn" class="btn btn-tweet">
+                    <i class="fa-brands fa-x-twitter"></i> Post to Twitter / X
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Toast Notification -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
